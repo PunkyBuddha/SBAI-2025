@@ -38,7 +38,7 @@ X_ant = [0;0;0]; % Vetor de posição anterior
 X_dot_ant = [0;0;0]; % Vetor de velocidade anterior
 alfa = 0.5; % Ganho do filtro de primeira ordem para derivada numerica
 X_dot_ref_til_ant = [0;0]; % Erro de x_dot_ref anterior
-w = (2*pi)/12;
+w = (2*pi)/30;
 m_hat = 10; % massa estimada
 g = 9.81; % aceleração gravitacional
 % thrust = m*g;
@@ -49,32 +49,29 @@ z_max = 1;
 
 
 %% Ganhos / Parametros
-Kd = diag([3 3]);
-Kp = diag([3 3]);
-Ku = diag([.88 .88]);
-% Ku = diag([.5 .33]);
-Kv = diag([1 1]);
-% Kv = diag([.006 .013]);
+Kd = diag([7 7]);
+Kp = diag([10 10]);
+Ku = diag([1 1]);
 Kz = 1;
-K_psi = 2;
+K_psi = 1;
 
 % % Prepare the new file.
 % vidObj = VideoWriter('Posicionamento.avi');
 % open(vidObj);
 
 figure();
-% try
-% while toc(t_exp) < T_exp
-%     if toc(t_run) > T_run
-%         tempo = [tempo toc(t_exp)];
-%         dt = toc(t_run);
-%         t_run = tic;
-%         t = toc(t_exp);
-%         t_corpo = tic;
+try
+while toc(t_exp) < T_exp
+    if toc(t_run) > T_run
+        tempo = [tempo toc(t_exp)];
+        dt = toc(t_run);
+        t_run = tic;
+        t = toc(t_exp);
+        t_corpo = tic;
 
-for t = 0:T_run:T_exp
-    tempo = [tempo t];
-    t_run = tic;
+% for t = 0:T_run:T_exp
+%     tempo = [tempo t];
+%     t_run = tic;
         
 % %       %% Leitura da pose do robô via optitrack
 %         quat = [pose.LatestMessage.Pose.Orientation.W pose.LatestMessage.Pose.Orientation.X pose.LatestMessage.Pose.Orientation.Y pose.LatestMessage.Pose.Orientation.Z]; % Recebe as informações de orientação em quaternal
@@ -91,19 +88,19 @@ for t = 0:T_run:T_exp
         %% PLANEJADOR DE MOVIMENTO
 
         % Posicionamento
-%         Xd = [0; 0; 1]; % Posição desejada
-%         Xd_dot = [0; 0; 0]; % Velocidade desejada
-%         Xd_2dot = [0; 0; 0]; % Aceleração desejada
-        
-          % % Lemniscata
-        Xd = [sin(w*t); sin(2*w*t); 1+0.25*sin(w*t)]; % Posição desejada
-        Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0.25*cos(w*t)*w]; % Velocidade desejada
-        Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; -0.25*sin(w*t)*w^2]; % Aceleração desejada
+        % Xd = [0; 0; 1]; % Posição desejada
+        % Xd_dot = [0; 0; 0]; % Velocidade desejada
+        % Xd_2dot = [0; 0; 0]; % Aceleração desejada
+
+        % % Lemniscata
+        % Xd = [sin(w*t); sin(2*w*t); 1+0.25*sin(w*t)]; % Posição desejada
+        % Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0.25*cos(w*t)*w]; % Velocidade desejada
+        % Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; -0.25*sin(w*t)*w^2]; % Aceleração desejada
         
         % Pringles
-        % Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
-        % Xd_dot = [cos(w*t)*w; -sin(w*t)*w; 0.25*cos(2*w*t)*2*w]; % Velocidade desejada
-        % Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
+        Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
+        Xd_dot = [cos(w*t)*w; -sin(w*t)*w; 0.25*cos(2*w*t)*2*w]; % Velocidade desejada
+        Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
 
         % % Orientação
         psid = [atan2(Xd_dot(2),Xd_dot(1)); 0]; % Orientação desejada
@@ -128,12 +125,14 @@ for t = 0:T_run:T_exp
 
         x_2dot_ref = Xd_2dot(1:2) + Kd*X_dot_til(1:2) + Kp*X_til(1:2); % Aceleração de referência
 
-        nu = nuo + inv(H*Ku)*(x_2dot_ref - X_dot(1:2)); % Lei de controle
+        thetamax = [theta_max phi_max]*nuo;
+        nu = nuo + inv(R*Ku)*(x_2dot_ref - X_2dot(1:2)); % Lei de controle
 
         theta = min(max(nu(1)/theta_max,-1),1); % Saturação de +-1 em theta
         phi = min(max(nu(2)/phi_max,-1),1); % Saturação de +-1 em phi
-            
-        nuo = [theta; phi]; % armazenamento do controle anterior
+
+        nu = [theta; phi]; % armazenamento do controle anterior
+
         %% Controle em z
 
         Z_dot_ref = Xd_dot(3) + Kz*X_til(3); % Velocidade de referência em z
@@ -156,7 +155,9 @@ for t = 0:T_run:T_exp
 
         u = [theta; -phi; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle
 
-        X_2dot = R*Ku*u(1:2) - R*Kv*X_dot(1:2);
+        X_2dot(1:2) = X_2dot(1:2) + R*Ku*(nu - nuo);
+
+        nuo = [theta; phi]; % armazenamento do controle anterior
 
         X_2dot(1) = min(max(X_2dot(1),-1),1);
         X_2dot(2) = min(max(X_2dot(2),-1),1);
@@ -258,9 +259,9 @@ for t = 0:T_run:T_exp
 %         send(pub,msg)
 
     end
-% end
-% catch ME
-% disp('Erro no codigo encontrado pela função try');
+end
+catch ME
+disp('Erro no codigo encontrado pela função try');
 % msg.Linear.X = 0;
 % msg.Linear.Y = 0;
 % msg.Linear.Z = 0;
@@ -269,7 +270,7 @@ for t = 0:T_run:T_exp
 % disp(ME);
 % disp('');
 % send(pub_land,msg_land);
-% end
+end
 
 %% ENVIO DE ZEROS AO SAIR DO LOOP
 % msg.Linear.X = 0;
