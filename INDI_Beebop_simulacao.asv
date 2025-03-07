@@ -8,8 +8,8 @@ rosshutdown;
 % timers
 T_exp = 60; % Tempo de experimento
 t_exp = tic;
-T_run = 1/30; % Período do experimento
-% T_run = 1/50;
+% T_run = 1/30; % Período do experimento
+T_run = 1/50;
 t_run = tic;
 
 T_draw=0;
@@ -31,6 +31,7 @@ pu = []; % Esforço de controlador
 er = []; % Erro para plot
 ppsid = []; % Orientação desejada
 ppsir = []; % Orientação realizada
+pibks = []; % Vetor de armazenamento controle IBKS
 nuo = [0;0];
 
 %% Parametros 
@@ -41,7 +42,6 @@ X_dot_ref_til_ant = [0;0]; % Erro de x_dot_ref anterior
 w = (2*pi)/30;
 m_hat = 10; % massa estimada
 g = 9.81; % aceleração gravitacional
-% thrust = m*g;
 theta_max = deg2rad(10);
 phi_max = deg2rad(10);
 psi_max = deg2rad(100);
@@ -49,12 +49,12 @@ z_max = 1;
 
 
 %% Ganhos / Parametros
-Kd = diag([7 7]);
-Kp = diag([7 7]);
+Kd = diag([3 6]);
+Kp = diag([4.5 8.5]);
 Ku = diag([.88 .88]);
-% Ku = diag([.5 .33]);
+Kv = diag([0.18227 0.17095]);
 Kz = 1;
-K_psi = 2;
+K_psi = 1;
 
 % % Prepare the new file.
 % vidObj = VideoWriter('Posicionamento.avi');
@@ -82,7 +82,8 @@ for t = 0:T_run:T_exp
 
         % X = position; % Vetor de posição  
         % X_dot = alfa*((X - X_ant)/dt) + (1 - alfa)*X_dot_ant; % Derivação numérica com filtro de primeira ordem
-        % X_dot_ant = X_dot; % Recebe velocidade anterior
+        X_dot_ant = X_dot; % Recebe velocidade anterior
+        X_2dot_ant = X_2dot; % Recebe velocidade anterior
         % X_ant = X; % Recebe posição anterior
         % psi = anglesXYZ(3); % Orientação do drone
 
@@ -94,9 +95,9 @@ for t = 0:T_run:T_exp
         % Xd_2dot = [0; 0; 0]; % Aceleração desejada
 
         % % Lemniscata
-        Xd = [sin(w*t); sin(2*w*t); 1+0.25*sin(w*t)]; % Posição desejada
-        Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0.25*cos(w*t)*w]; % Velocidade desejada
-        Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; -0.25*sin(w*t)*w^2]; % Aceleração desejada
+        Xd = [sin(w*t); sin(2*w*t); 1]; % Posição desejada
+        Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0]; % Velocidade desejada
+        Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
         
         % Pringles
         % Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
@@ -122,16 +123,21 @@ for t = 0:T_run:T_exp
         X_til = Xd - X; % Erro de posicionamento
         X_dot_til = Xd_dot - X_dot; % Erro de Velocidade
 
-        %% Lei de controle
-
         x_2dot_ref = Xd_2dot(1:2) + Kd*X_dot_til(1:2) + Kp*X_til(1:2); % Aceleração de referência
 
-        nu = nuo + inv(R*Ku)*(x_2dot_ref - X_2dot(1:2)); % Lei de controle
+        nu = inv(R*Ku)*(x_2dot_ref + Kv*X_dot(1:2)); % Lei de controle linear
+        nui = nuo + inv(R*Ku)*(x_2dot_ref - X_2dot_ant(1:2)); % Lei de controle IBKS
 
         theta = min(max(nu(1)/theta_max,-1),1); % Saturação de +-1 em theta
         phi = min(max(nu(2)/phi_max,-1),1); % Saturação de +-1 em phi
 
-        nu = [theta; phi]; % armazenamento do controle anterior
+        thetai = min(max(nui(1)/theta_max,-1),1); % Saturação de +-1 em theta
+        phii = min(max(nui(2)/phi_max,-1),1); % Saturação de +-1 em phi
+
+        nu = [theta; phi]; 
+        nui = [thetai; phii]; 
+
+        nuo = nui;
 
         %% Controle em z
 
@@ -153,18 +159,15 @@ for t = 0:T_run:T_exp
 
         psi_dot_ref = min(max(psi_dot_ref/psi_max,-1),1); % Limitador do controlador em psi
 
-        u = [theta; -phi; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle
-        % u = [nu(1); -nu(2); Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle
+        u = [theta; -phi; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle Linear
+        % u = [thetai; -phii; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle IBKS
 
-        % X_2dot = H*Ku*u(1:2);
-        X_2dot(1:2) = X_2dot(1:2) + R*Ku*(nu - nuo);
-
-        nuo = [theta; phi]; % armazenamento do controle anterior
-        % nuo = nu;
+        X_2dot(1:2) = R*Ku*nu;
+        % X_2dot(1:2) = R*Ku*nui;
 
         X_2dot(1) = min(max(X_2dot(1),-1),1);
         X_2dot(2) = min(max(X_2dot(2),-1),1);
-        
+
         %% SIMULACAO
 
         X_dot(1:2) = X_dot(1:2) + X_2dot(1:2)*T_run; % Integracao de acc para achar vel
@@ -177,6 +180,7 @@ for t = 0:T_run:T_exp
         ppsir = [ppsir psi]; % Recebe orientação para calculo de erro
 
         pu = [pu u];
+        pibks = [pibks nui];
         paccr = [paccr X_2dot];
 
         l = 0.1;
@@ -387,22 +391,37 @@ grid on
 % figure('Name','Derivada do vetor Tempo')
 % plot(diff(tempo),'LineWidth',1);
 
+figure('Name','Gráficos de Controle VS Tempo')
+subplot(2,1,1)
+plot (tempo,pu(1,:),'r','LineWidth',1);
+hold on
+plot (tempo,pibks(1,:),'b--','LineWidth',1);
+xlabel('Tempo(s)');ylabel('Esforço do controlador em Theta');
+legend('Controle Linear','Controle IBKS');
+grid on
+subplot(2,1,2)
+plot (tempo,pu(2,:),'r','LineWidth',1);
+hold on
+plot (tempo,pibks(2,:),'b--','LineWidth',1);
+xlabel('Tempo(s)');ylabel('Esforço do controlador em Phi');
+legend('Controle Linear','Controle IBKS');
+grid on
 
-figure('Name','Esforço do controlador')
-subplot(4,1,1)
-plot (tempo,pu(1,:),'b');
-xlabel('Tempo(s)');ylabel('Esforço do controlador em theta');
-grid on
-subplot(4,1,2)
-plot (tempo,pu(2,:),'b');
-xlabel('Tempo(s)');ylabel('Esforço do controlador em phi');
-grid on
-subplot(4,1,3)
-plot (tempo,pu(3,:),'b');
-xlabel('Tempo(s)');ylabel('Esforço do controlador em z');
-grid on
-subplot(4,1,4)
-plot (tempo,pu(4,:),'b');
-xlabel('Tempo(s)');ylabel('Esforço do controlador em psi');
-grid on
+% figure('Name','Esforço do controlador')
+% subplot(4,1,1)
+% plot (tempo,pu(1,:),'b');
+% xlabel('Tempo(s)');ylabel('Esforço do controlador em theta');
+% grid on
+% subplot(4,1,2)
+% plot (tempo,pu(2,:),'b');
+% xlabel('Tempo(s)');ylabel('Esforço do controlador em phi');
+% grid on
+% subplot(4,1,3)
+% plot (tempo,pu(3,:),'b');
+% xlabel('Tempo(s)');ylabel('Esforço do controlador em z');
+% grid on
+% subplot(4,1,4)
+% plot (tempo,pu(4,:),'b');
+% xlabel('Tempo(s)');ylabel('Esforço do controlador em psi');
+% grid on
 

@@ -169,12 +169,13 @@ while toc(t_exp) < T_exp
 
         pu = [pu u]; % Armazenamento dos valores de u para plot de esforço de controlador
 
-        pr = [pr X]; % Armazenamento de posição para calculo de erro
-        pvelr = [pvelr X_dot]; % Armazenamento de velocidade para calculo de erro
-        paccr = [paccr X_2dot]; % Armazenamento de Aceleração para calculo de erro
+        pr = [pr X(1:3)]; % Armazenamento de posição para calculo de erro
+        pvelr = [pvelr X_dot(1:3)]; % Armazenamento de velocidade para calculo de erro
         ppsir = [ppsir psi]; %  Armazenamento de orientação para calculo de erro
-        pu = [pu u]; % Armazenamento do sinal de controle para plot 
-        
+        pu = [pu u];
+        pibks = [pibks nui];
+        paccr = [paccr X_2dot];
+
         %% Segurança
 %         disp(u')        
         
