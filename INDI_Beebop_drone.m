@@ -58,10 +58,12 @@ er = []; % Erro para plot
 ppsid = []; % Orientação desejada
 ppsir = []; % Orientação realizada
 pibks = []; % Vetor de armazenamento controle IBKS
+thetai = 0;
+phii = 0;
 
 %% Parametros 
 alfa = 0.5; % Ganho do filtro de primeira ordem para derivada numerica
-w = (2*pi)/30; % Frequência da trajetória
+w = (2*pi)/25; % Frequência da trajetória
 theta_max = deg2rad(10); % Angulo maximo desejado em Theta
 phi_max = deg2rad(10); % Angulo maximo desejado em Phi
 psi_max = deg2rad(100); % Angulo maximo desejado em Psi
@@ -70,12 +72,14 @@ z_max = 1; % Velocidade máxima desejada em z
 %% Ganhos / Parametros
 % Kd = diag([3 6]); % Ganho diferencial (Em relação ao erro de velocidade)
 % Kp = diag([4.5 8.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
-Kd = diag([1 1]); % Ganho diferencial (Em relação ao erro de velocidade)
-Kp = diag([1 1]); % Ganho proporcional (Em relação ao erro de posicionamento)
+Kd = diag([4 6]); % Ganho diferencial (Em relação ao erro de velocidade)
+Kp = diag([3.5 5]); % Ganho proporcional (Em relação ao erro de posicionamento)
+% Kd = diag([1.5 1.5]);
+% Kp = diag([1 1]);
 Ku = diag([.88 .88]); % Parametro de modelagem em relação a u
 Kv = diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
 Kz = 1; % Ganho em z
-K_psi = 1; % Ganho em psi
+K_psi = 2; % Ganho em psi
 
 %% Drone takeoff
 send(pub_takeoff,msg_takeoff)
@@ -107,13 +111,17 @@ while toc(t_exp) < T_exp
 
         %% PLANEJADOR DE MOVIMENTO
         % % Lemniscata
-        Xd = [sin(w*t); sin(2*w*t); 1]; % Posição desejada
-        Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0]; % Velocidade desejada
-        Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
+%         Xd = [sin(w*t); sin(2*w*t); 1]; % Posição desejada
+%         Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0]; % Velocidade desejada
+%         Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
 
 %         Xd = [0; 0; 1]; % Posição desejada
 %         Xd_dot = [0; 0; 0]; % Velocidade desejada
 %         Xd_2dot = [0; 0; 0]; % Aceleração desejada
+
+        Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
+        Xd_dot = [cos(w*t)*w; -sin(w*t)*w; 0.25*cos(2*w*t)*2*w]; % Velocidade desejada
+        Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
 
         % % Orientação
         psid = [atan2(Xd_dot(2),Xd_dot(1)); 0]; % Orientação desejada
@@ -121,7 +129,7 @@ while toc(t_exp) < T_exp
         pd = [pd Xd(1:3)]; % Armazenamento da posição desejada
         pveld = [pveld Xd_dot(1:3)]; % Armazenamento da velocidade desejada
         paccd = [paccd Xd_2dot(1:3)]; % Armazenamento da velocidade desejada
-        ppsid = [ppsid psid]; % Armazenamento da orientação desejada
+        ppsid = [ppsid psid(1)]; % Armazenamento da orientação desejada
 
         %% LEI DE CONTROLE
 
@@ -133,18 +141,20 @@ while toc(t_exp) < T_exp
 
         x_2dot_ref = Xd_2dot(1:2) + Kd*X_dot_til(1:2) + Kp*X_til(1:2); % Aceleração de referência
 
-        nu = inv(R*Ku)*(x_2dot_ref + Kv*X_dot(1:2)); % Lei de controle linear
+        nuo = [thetai*theta_max; phii*phi_max];
+
+%         nu = inv(R*Ku)*(x_2dot_ref + Kv*X_dot(1:2)); % Lei de controle linear
         nui = nuo + inv(R*Ku)*(x_2dot_ref - X_2dot_ant(1:2)); % Lei de controle IBKS
 
-        theta = min(max(nu(1)/theta_max,-1),1); % Saturação de +-1 em theta Linear
-        phi = min(max(nu(2)/phi_max,-1),1); % Saturação de +-1 em phi Linear
+%         theta = min(max(nu(1)/theta_max,-1),1); % Saturação de +-1 em theta Linear
+%         phi = min(max(nu(2)/phi_max,-1),1); % Saturação de +-1 em phi Linear
 
         thetai = min(max(nui(1)/theta_max,-1),1); % Saturação de +-1 em theta IBKS
         phii = min(max(nui(2)/phi_max,-1),1); % Saturação de +-1 em phi IBKS
  
-        nui = [thetai; phii]; 
-
-        nuo = nui;
+%         nui = [thetai; phii]; 
+% 
+%         nuo = nui;
 
         %% Controle em z
 
@@ -165,10 +175,8 @@ while toc(t_exp) < T_exp
 
         psi_dot_ref = min(max(psi_dot_ref/psi_max,-1),1); % Limitador do controlador em z
 
-        u = [theta; -phi; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle Linear
-        % u = [thetai; -phii; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle IBKS
-
-        pu = [pu u]; % Armazenamento dos valores de u para plot de esforço de controlador
+%         u = [theta; -phi; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle Linear
+        u = [thetai; -phii; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle IBKS
 
         pr = [pr X]; % Armazenamento de posição para calculo de erro
         pvelr = [pvelr X_dot]; % Armazenamento de velocidade para calculo de erro
@@ -229,7 +237,7 @@ while toc(t_exp) < T_exp
 
         %% ENVIO DOS SINAIS DE CONTROLE
         
-        disp(u')
+%         disp(u')
         msg.Linear.X = u(1);
         msg.Linear.Y = u(2);
         msg.Linear.Z = u(3);
@@ -262,10 +270,6 @@ for i=1:5
 send(pub_land,msg_land);
 pause(0.2);
 end
-
-
-% % % Close the file.
-% % close(vidObj);
 
 er = pd - pr; % Calculo de erros de posicionamento
 err = ppsid - ppsir;
@@ -375,4 +379,3 @@ subplot(4,1,4)
 plot (tempo,pu(4,:),'b');
 xlabel('Tempo(s)');ylabel('Esforço do controlador em psi');
 grid on
-
