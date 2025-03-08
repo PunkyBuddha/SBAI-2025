@@ -36,8 +36,8 @@ ButtonHandle = uicontrol('Style', 'PushButton', ...
 %% timers
 T_exp = 60; % Tempo de experimento
 t_exp = tic;
-% T_run = 1/30; % Período do experimento
-T_run = 1/50;
+T_run = 1/30; % Período do experimento
+% T_run = 1/50;
 t_run = tic;
 T_draw=0;
 tempo = [];
@@ -71,19 +71,19 @@ z_max = 1; % Velocidade máxima desejada em z
 Kd = diag([3 6]); % Ganho diferencial (Em relação ao erro de velocidade)
 Kp = diag([4.5 8.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
 Ku = diag([.88 .88]); % Parametro de modelagem em relação a u
-Kv = diag([1 1]); % Parametro de modelagem em relação ao disturbio de flapping
+Kv = diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
 Kz = 1; % Ganho em z
 K_psi = 1; % Ganho em psi
 
 %% Drone takeoff
-send(pub_takeoff,msg_takeoff)
-pause(3);
+% send(pub_takeoff,msg_takeoff)
+% pause(3);
 
 %% Loop de controle
-try
+% try
 while toc(t_exp) < T_exp
     if toc(t_run) > T_run
-        tempo = [tempo t0oc(t_exp)];
+        tempo = [tempo toc(t_exp)];
         dt = toc(t_run);
         t_run = tic;
         t = toc(t_exp);
@@ -110,9 +110,13 @@ while toc(t_exp) < T_exp
 
         %% PLANEJADOR DE MOVIMENTO
         % % Lemniscata
-        Xd = [sin(w*t); sin(2*w*t); 1]; % Posição desejada
-        Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0]; % Velocidade desejada
-        Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
+%         Xd = [sin(w*t); sin(2*w*t); 1]; % Posição desejada
+%         Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0]; % Velocidade desejada
+%         Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
+
+        Xd = [0; 0; 1]; % Posição desejada
+        Xd_dot = [0; 0; 0]; % Velocidade desejada
+        Xd_2dot = [0; 0; 0]; % Aceleração desejada
 
         % % Orientação
         psid = [atan2(Xd_dot(2),Xd_dot(1)); 0]; % Orientação desejada
@@ -176,7 +180,7 @@ while toc(t_exp) < T_exp
         pu = [pu u]; % Armazenamento do sinal de controle para plot 
         
         %% Segurança
-%         disp(u')        
+        disp(u')        
         
 %         u = [0 0 0 0]';
         
@@ -229,25 +233,25 @@ while toc(t_exp) < T_exp
         %% ENVIO DOS SINAIS DE CONTROLE
         
 %         disp(u')
-        msg.Linear.X = u(1);
-        msg.Linear.Y = u(2);
-        msg.Linear.Z = u(3);
-        msg.Angular.Z = u(4);
+%         msg.Linear.X = u(1);
+%         msg.Linear.Y = u(2);
+%         msg.Linear.Z = u(3);
+%         msg.Angular.Z = u(4);
         
-        send(pub,msg)
+%         send(pub,msg)
     end
 end
-catch ME
-disp('Erro no codigo encontrado pela função try');
-msg.Linear.X = 0;
-msg.Linear.Y = 0;
-msg.Linear.Z = 0;
-msg.Angular.Z = 0;
-disp('');
-disp(ME);
-disp('');
-send(pub_land,msg_land);
-end
+% catch ME
+% disp('Erro no codigo encontrado pela função try');
+% msg.Linear.X = 0;
+% msg.Linear.Y = 0;
+% msg.Linear.Z = 0;
+% msg.Angular.Z = 0;
+% disp('');
+% disp(ME);
+% disp('');
+% send(pub_land,msg_land);
+% end
 
 %% ENVIO DE ZEROS AO SAIR DO LOOP
 msg.Linear.X = 0;
@@ -268,7 +272,7 @@ end
 
 er = pd - pr; % Calculo de erros de posicionamento
 err = ppsid - ppsir;
-d_ec=sqrt(er(1,:).^2+er(2,:).^2); % Calculo de erro euclidiano
+% d_ec=sqrt(er(1,:).^2+er(2,:).^2); % Calculo de erro euclidiano
 
 figure('Name','Graficos de erro')
 subplot(4,1,1)
