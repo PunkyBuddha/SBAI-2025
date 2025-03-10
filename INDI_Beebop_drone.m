@@ -46,7 +46,6 @@ tempo = [];
 X_ant = [0;0;0]; % Vetor de posição anterior
 X_dot_ant = [0;0;0]; % Vetor de velocidade anterior
 X_2dot_ant = [0;0;0]; % Vetor de aceleração anterior
-nuo = [0;0]; % Vetor de sinal de controle anterior
 pd = []; % Posição desejada para plot
 pr = []; % Posição realizada para plot
 pveld = []; % Velocidade desejada para plot
@@ -60,26 +59,24 @@ ppsir = []; % Orientação realizada
 pibks = []; % Vetor de armazenamento controle IBKS
 thetai = 0;
 phii = 0;
+nuo_ant = [0;0];
 
 %% Parametros 
 alfa = 0.5; % Ganho do filtro de primeira ordem para derivada numerica
-w = (2*pi)/25; % Frequência da trajetória
+w = (2*pi)/15; % Frequência da trajetória
 theta_max = deg2rad(10); % Angulo maximo desejado em Theta
 phi_max = deg2rad(10); % Angulo maximo desejado em Phi
 psi_max = deg2rad(100); % Angulo maximo desejado em Psi
 z_max = 1; % Velocidade máxima desejada em z
 
 %% Ganhos / Parametros
-% Kd = diag([3 6]); % Ganho diferencial (Em relação ao erro de velocidade)
-% Kp = diag([4.5 8.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
-Kd = diag([4 6]); % Ganho diferencial (Em relação ao erro de velocidade)
-Kp = diag([3.5 5]); % Ganho proporcional (Em relação ao erro de posicionamento)
-% Kd = diag([1.5 1.5]);
-% Kp = diag([1 1]);
+Kd = diag([4.5 7]); % Ganho diferencial (Em relação ao erro de velocidade)
+Kp = diag([4 5.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
 Ku = diag([.88 .88]); % Parametro de modelagem em relação a u
 Kv = diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
 Kz = 1; % Ganho em z
 K_psi = 2; % Ganho em psi
+lambda = 1;
 
 %% Drone takeoff
 send(pub_takeoff,msg_takeoff)
@@ -108,6 +105,8 @@ while toc(t_exp) < T_exp
         X_dot_ant = X_dot; % Recebe velocidade anterior
         X_ant = X; % Recebe posição anterior
         psi = anglesXYZ(3); % Orientação do drone
+        nuo = alfa*(anglesXYZ(1:2) - nuo_ant) + (1 - alfa)*nuo_ant; % Angulos reais do drone em theta e phi
+        nuo_ant = nuo;
 
         %% PLANEJADOR DE MOVIMENTO
         % % Lemniscata
@@ -141,20 +140,14 @@ while toc(t_exp) < T_exp
 
         x_2dot_ref = Xd_2dot(1:2) + Kd*X_dot_til(1:2) + Kp*X_til(1:2); % Aceleração de referência
 
-        nuo = [thetai*theta_max; phii*phi_max];
-
 %         nu = inv(R*Ku)*(x_2dot_ref + Kv*X_dot(1:2)); % Lei de controle linear
-        nui = nuo + inv(R*Ku)*(x_2dot_ref - X_2dot_ant(1:2)); % Lei de controle IBKS
+        nui = nuo + lambda*inv(R*Ku)*(x_2dot_ref - X_2dot_ant(1:2)); % Lei de controle IBKS
 
-%         theta = min(max(nu(1)/theta_max,-1),1); % Saturação de +-1 em theta Linear
-%         phi = min(max(nu(2)/phi_max,-1),1); % Saturação de +-1 em phi Linear
+%         theta = min(max(nu(1),-1),1); % Saturação de +-1 em theta Linear
+%         phi = min(max(nu(2),-1),1); % Saturação de +-1 em phi Linear
 
-        thetai = min(max(nui(1)/theta_max,-1),1); % Saturação de +-1 em theta IBKS
-        phii = min(max(nui(2)/phi_max,-1),1); % Saturação de +-1 em phi IBKS
- 
-%         nui = [thetai; phii]; 
-% 
-%         nuo = nui;
+        thetai = min(max(nui(1),-1),1); % Saturação de +-1 em theta IBKS
+        phii = min(max(nui(2),-1),1); % Saturação de +-1 em phi IBKS
 
         %% Controle em z
 
