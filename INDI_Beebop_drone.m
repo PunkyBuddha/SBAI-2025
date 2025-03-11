@@ -46,6 +46,8 @@ tempo = [];
 X_ant = [0;0;0]; % Vetor de posição anterior
 X_dot_ant = [0;0;0]; % Vetor de velocidade anterior
 X_2dot_ant = [0;0;0]; % Vetor de aceleração anterior
+nuo_ant = [0;0];
+psi_ant = 0;
 pd = []; % Posição desejada para plot
 pr = []; % Posição realizada para plot
 pveld = []; % Velocidade desejada para plot
@@ -59,10 +61,13 @@ ppsir = []; % Orientação realizada
 pibks = []; % Vetor de armazenamento controle IBKS
 thetai = 0;
 phii = 0;
-nuo_ant = [0;0];
+
+Xfo = [0;0;0];
 
 %% Parametros 
 alfa = 0.5; % Ganho do filtro de primeira ordem para derivada numerica
+lambda = 0.6;
+tao = 1;
 w = (2*pi)/15; % Frequência da trajetória
 theta_max = deg2rad(10); % Angulo maximo desejado em Theta
 phi_max = deg2rad(10); % Angulo maximo desejado em Phi
@@ -76,7 +81,7 @@ Ku = diag([.88 .88]); % Parametro de modelagem em relação a u
 Kv = diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
 Kz = 1; % Ganho em z
 K_psi = 2; % Ganho em psi
-lambda = 1;
+
 
 %% Drone takeoff
 send(pub_takeoff,msg_takeoff)
@@ -98,29 +103,40 @@ while toc(t_exp) < T_exp
         position = [pose.LatestMessage.Pose.Position.X;pose.LatestMessage.Pose.Position.Y;pose.LatestMessage.Pose.Position.Z]; % Recebe informações de posição
         anglesXYZ = [EulZYX(3); EulZYX(2); EulZYX(1)]; % Reorganiza o vetor para theta, phi, psi
 
-        X = position; % Vetor de posição  
-        X_dot = alfa*((X - X_ant)/dt) + (1 - alfa)*X_dot_ant; % Derivação numérica da posição com filtro de primeira ordem
-        X_2dot = alfa*((X_dot - X_dot_ant)/dt) + (1 - alfa)*X_2dot_ant; % Derivação numérica da velocidade com filtro de primeira ordem
+        % X = position; % Vetor de posição  
+        % X_dot = alfa*((X - X_ant)/dt) + (1 - alfa)*X_dot_ant; % Derivação numérica da posição com filtro de primeira ordem
+        % X_2dot = alfa*((X_dot - X_dot_ant)/dt) + (1 - alfa)*X_2dot_ant; % Derivação numérica da velocidade com filtro de primeira ordem
+        % X_2dot_ant = X_2dot; % Recebe aceleração anterior
+        % X_dot_ant = X_dot; % Recebe velocidade anterior
+        % X_ant = X; % Recebe posição anterior
+        % psi = anglesXYZ(3); % Orientação do drone
+        % nuo = alfa*(anglesXYZ(1:2) - nuo_ant) + (1 - alfa)*nuo_ant; % Angulos reais do drone em theta e phi
+        % nuo_ant = nuo;
+
+        X = inv(1 - (dt/tao))*(X_ant + (dt/tao)*position);
+        psi = inv(1 - (dt/tao))*(psi_ant + (dt/tao)*anglesXYZ(3)); % Orientação do drone
+        nuo = inv(1 - (dt/tao))*(nuo_ant + (dt/tao)*anglesXYZ(1:2));
+        X_dot = (X - X_ant)/dt;
+        X_2dot = (X_dot - X_dot_ant)/dt;
+        X_ant = X;
+        X_dot_ant = X_dot;
         X_2dot_ant = X_2dot; % Recebe aceleração anterior
-        X_dot_ant = X_dot; % Recebe velocidade anterior
-        X_ant = X; % Recebe posição anterior
-        psi = anglesXYZ(3); % Orientação do drone
-        nuo = alfa*(anglesXYZ(1:2) - nuo_ant) + (1 - alfa)*nuo_ant; % Angulos reais do drone em theta e phi
         nuo_ant = nuo;
+        psi_ant = psi;
 
         %% PLANEJADOR DE MOVIMENTO
         % % Lemniscata
-%         Xd = [sin(w*t); sin(2*w*t); 1]; % Posição desejada
-%         Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0]; % Velocidade desejada
-%         Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
+        Xd = [sin(w*t); sin(2*w*t); 1]; % Posição desejada
+        Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0]; % Velocidade desejada
+        Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
 
 %         Xd = [0; 0; 1]; % Posição desejada
 %         Xd_dot = [0; 0; 0]; % Velocidade desejada
 %         Xd_2dot = [0; 0; 0]; % Aceleração desejada
 
-        Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
-        Xd_dot = [cos(w*t)*w; -sin(w*t)*w; 0.25*cos(2*w*t)*2*w]; % Velocidade desejada
-        Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
+        % Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
+        % Xd_dot = [cos(w*t)*w; -sin(w*t)*w; 0.25*cos(2*w*t)*2*w]; % Velocidade desejada
+        % Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
 
         % % Orientação
         psid = [atan2(Xd_dot(2),Xd_dot(1)); 0]; % Orientação desejada
