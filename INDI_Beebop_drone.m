@@ -68,6 +68,7 @@ vsx = [];
 vsy = [];
 
 %% Parametros 
+flag = 0; % Linear = 0; INDI = 1;
 alfa = 0.5; % Ganho do filtro de primeira ordem para derivada numerica
 lambda = .9;
 tao = 1;
@@ -186,14 +187,18 @@ while toc(t_exp) < T_exp
 
         x_2dot_ref = Xd_2dot(1:2) + Kd*X_dot_til(1:2) + Kp*X_til(1:2); % Aceleração de referência
 
-        nu = inv(R*Ku)*(x_2dot_ref + Kv*X_dot(1:2)); % Lei de controle linear
-%         nui = nuo + lambda*inv(R*Ku)*(x_2dot_ref - X_2dot_ant(1:2)); % Lei de controle IBKS
+        if flag == 0
+            nu = inv(R*Ku)*(x_2dot_ref + Kv*X_dot(1:2)); % Lei de controle linear
 
-        theta = min(max(nu(1),-1),1); % Saturação de +-1 em theta Linear
-        phi = min(max(nu(2),-1),1); % Saturação de +-1 em phi Linear
+            theta = min(max(nu(1),-1),1); % Saturação de +-1 em theta Linear
+            phi = min(max(nu(2),-1),1); % Saturação de +-1 em phi Linear
+        else if flag == 1
+                nui = nuo + lambda*inv(R*Ku)*(x_2dot_ref - X_2dot_ant(1:2)); % Lei de controle IBKS
 
-%         thetai = min(max(nui(1),-1),1); % Saturação de +-1 em theta IBKS
-%         phii = min(max(nui(2),-1),1); % Saturação de +-1 em phi IBKS
+                thetai = min(max(nui(1),-1),1); % Saturação de +-1 em theta IBKS
+                phii = min(max(nui(2),-1),1); % Saturação de +-1 em phi IBKS
+        end
+        end
 
         %% Controle em z
 
@@ -214,8 +219,12 @@ while toc(t_exp) < T_exp
 
         psi_dot_ref = min(max(psi_dot_ref/psi_max,-1),1); % Limitador do controlador em z
 
-        u = [theta; -phi; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle Linear
-%         u = [thetai; -phii; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle IBKS
+        if flag == 0
+            u = [theta; -phi; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle Linear
+        else if flag == 1
+            u = [thetai; -phii; Z_dot_ref; psi_dot_ref]; % Vetor de comandos de controle IBKS
+        end
+        end
 
         pr = [pr X]; % Armazenamento de posição para calculo de erro
         pvelr = [pvelr X_dot]; % Armazenamento de velocidade para calculo de erro
