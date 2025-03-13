@@ -34,10 +34,10 @@ ButtonHandle = uicontrol('Style', 'PushButton', ...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% timers
-T_exp = 300; % Tempo de experimento
+T_exp = 60; % Tempo de experimento
 t_exp = tic;
-% T_run = 1/30; % Período do experimento
-T_run = 1/50;
+T_run = 1/30; % Período do experimento
+% T_run = 1/50;
 t_run = tic;
 T_draw=0;
 tempo = [];
@@ -68,25 +68,24 @@ vsx = [];
 vsy = [];
 
 %% Parametros 
-flag = 0; % Linear = 0; INDI = 1;
-alfa = 0.5; % Ganho do filtro de primeira ordem para derivada numerica
-lambda = .9;
+flag = 1; % Linear = 0; INDI = 1;
+alfa = .5; % Ganho do filtro de primeira ordem para derivada numerica
+alfau = .001; % Ganho do filtro de primeira ordem para derivada numerica em nuo
+lambda = .4;
 tao = 1;
-w = (2*pi)/8; % Frequência da trajetória
+w = (2*pi)/7; % Frequência da trajetória
 theta_max = deg2rad(10); % Angulo maximo desejado em Theta
 phi_max = deg2rad(10); % Angulo maximo desejado em Phi
 psi_max = deg2rad(100); % Angulo maximo desejado em Psi
 z_max = 1; % Velocidade máxima desejada em z
 
 %% Ganhos / Parametros
-% Kd = diag([4.5 7]); % Ganho diferencial (Em relação ao erro de velocidade)
-% Kp = diag([4 5.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
-Kd = diag([7 7]); % Ganho diferencial (Em relação ao erro de velocidade)
-Kp = diag([5.5 5.5]);
+Kd = 1/4*diag([7 7]); % Ganho diferencial (Em relação ao erro de velocidade)
+Kp = 1/5*diag([5.5 5.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
 Ku = diag([.88 .88]); % Parametro de modelagem em relação a u
-Kv = 1.5*diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
+Kv = diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
 Kz = 1; % Ganho em z
-K_psi = 2.5; % Ganho em psi
+K_psi = 3; % Ganho em psi
 
 %% Filtro de segunda ordem
 
@@ -121,14 +120,14 @@ while toc(t_exp) < T_exp
         position = [pose.LatestMessage.Pose.Position.X;pose.LatestMessage.Pose.Position.Y;pose.LatestMessage.Pose.Position.Z]; % Recebe informações de posição
         anglesXYZ = [EulZYX(3); EulZYX(2); EulZYX(1)]; % Reorganiza o vetor para theta, phi, psi
 
-%         X = position; % Vetor de posição  
-%         X_dot = alfa*((X - X_ant)/dt) + (1 - alfa)*X_dot_ant; % Derivação numérica da posição com filtro de primeira ordem
-%         X_2dot = alfa*((X_dot - X_dot_ant)/dt) + (1 - alfa)*X_2dot_ant; % Derivação numérica da velocidade com filtro de primeira ordem
-%         X_2dot_ant = X_2dot; % Recebe aceleração anterior
-%         X_dot_ant = X_dot; % Recebe velocidade anterior
-%         X_ant = X; % Recebe posição anterior
+        X = position; % Vetor de posição  
+        X_dot = alfa*((X - X_ant)/dt) + (1 - alfa)*X_dot_ant; % Derivação numérica da posição com filtro de primeira ordem
+        X_2dot = alfa*((X_dot - X_dot_ant)/dt) + (1 - alfa)*X_2dot_ant; % Derivação numérica da velocidade com filtro de primeira ordem
+        X_2dot_ant = X_2dot; % Recebe aceleração anterior
+        X_dot_ant = X_dot; % Recebe velocidade anterior
+        X_ant = X; % Recebe posição anterior
         psi = anglesXYZ(3); % Orientação do drone
-        nuo = alfa*(anglesXYZ(1:2) - nuo_ant) + (1 - alfa)*nuo_ant; % Angulos reais do drone em theta e phi
+        nuo = alfau*(anglesXYZ(1:2) - nuo_ant) + (1 - alfau)*nuo_ant; % Angulos reais do drone em theta e phi
         nuo_ant = nuo;
 
 
@@ -143,31 +142,31 @@ while toc(t_exp) < T_exp
 %         nuo_ant = nuo;
 %         psi_ant = psi;
         
-        sx = C*qx + D*position(1);
-        sy = C*qy + D*position(2);
-        qx = Ad*qx + Bd*position(1);
-        qy = Ad*qy + Bd*position(2);
-
-        vsx = [vsx sx];
-        vsy = [vsy sy];
-
-        X = [sx(1); sy(1); position(3)];
-        X_dot = [sx(2); sy(2); 0];
-        X_2dot = [sx(3); sy(3); 0];
+%         sx = C*qx + D*position(1);
+%         sy = C*qy + D*position(2);
+%         qx = Ad*qx + Bd*position(1);
+%         qy = Ad*qy + Bd*position(2);
+% 
+%         vsx = [vsx sx];
+%         vsy = [vsy sy];
+% 
+%         X = [sx(1); sy(1); position(3)];
+%         X_dot = [sx(2); sy(2); 0];
+%         X_2dot = [sx(3); sy(3); 0];
 
         %% PLANEJADOR DE MOVIMENTO
         % % Lemniscata
-%         Xd = [sin(w*t); sin(2*w*t); 1]; % Posição desejada
-%         Xd_dot = [cos(w*t)*w; cos(2*w*t)*2*w; 0]; % Velocidade desejada
-%         Xd_2dot = [-sin(w*t)*w^2; -sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
+        Xd = [.7*sin(w*t); .7*sin(2*w*t); 1]; % Posição desejada
+        Xd_dot = [.7*cos(w*t)*w; .7*cos(2*w*t)*2*w; 0]; % Velocidade desejada
+        Xd_2dot = [-.7*sin(w*t)*w^2; -.7*sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
 
 %         Xd = [0; 0; 1]; % Posição desejada
 %         Xd_dot = [0; 0; 0]; % Velocidade desejada
 %         Xd_2dot = [0; 0; 0]; % Aceleração desejada
 
-        Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
-        Xd_dot = [cos(w*t)*w; -sin(w*t)*w; 0.25*cos(2*w*t)*2*w]; % Velocidade desejada
-        Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
+%         Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
+%         Xd_dot = [cos(w*t)*w; -sin(w*t)*w; 0.25*cos(2*w*t)*2*w]; % Velocidade desejada
+%         Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
 
         % % Orientação
         psid = [atan2(Xd_dot(2),Xd_dot(1)); 0]; % Orientação desejada
@@ -285,7 +284,7 @@ while toc(t_exp) < T_exp
 
         %% ENVIO DOS SINAIS DE CONTROLE
         
-        if toc(t_exp) > 4
+%         if toc(t_exp) > 4
 %         disp(u')
         msg.Linear.X = u(1);
         msg.Linear.Y = u(2);
@@ -293,7 +292,7 @@ while toc(t_exp) < T_exp
         msg.Angular.Z = u(4);
         
         send(pub,msg)
-        end
+%         end
     end
 end
 catch ME
@@ -347,7 +346,7 @@ figure('Name','Gráficos de posição vs Tempo')
 subplot(4,1,1)
 plot (tempo,pr(1,:),'r','LineWidth',1);
 hold on
-plot (tempo,vsx(1,:),'k','LineWidth',1);
+% plot (tempo,vsx(1,:),'k','LineWidth',1);
 hold on
 plot (tempo,pd(1,:),'b--','LineWidth',1);
 xlabel('Tempo(s)');ylabel('Posição em x (m)');
@@ -356,7 +355,7 @@ grid on
 subplot(4,1,2)
 plot (tempo,pr(2,:),'r','LineWidth',1);
 hold on
-plot (tempo,vsy(1,:),'k','LineWidth',1);
+% plot (tempo,vsy(1,:),'k','LineWidth',1);
 hold on
 plot (tempo,pd(2,:),'b--','LineWidth',1);
 xlabel('Tempo(s)');ylabel('Posição em y (m)');
@@ -381,7 +380,7 @@ figure('Name','Gráficos de velocidade vs Tempo')
 subplot(3,1,1)
 plot (tempo,pvelr(1,:),'r','LineWidth',1);
 hold on
-plot (tempo,vsx(2,:),'k','LineWidth',1);
+% plot (tempo,vsx(2,:),'k','LineWidth',1);
 hold on
 plot (tempo,pveld(1,:),'b--','LineWidth',1);
 xlabel('Tempo(s)');ylabel('Velocidade em x (m/s)');
@@ -390,7 +389,7 @@ grid on
 subplot(3,1,2)
 plot (tempo,pvelr(2,:),'r','LineWidth',1);
 hold on
-plot (tempo,vsy(2,:),'k','LineWidth',1);
+% plot (tempo,vsy(2,:),'k','LineWidth',1);
 hold on
 plot (tempo,pveld(2,:),'b--','LineWidth',1);
 xlabel('Tempo(s)');ylabel('Velocidade em y (m/s)');
@@ -408,7 +407,7 @@ figure('Name','Gráficos de Aceleração vs Tempo')
 subplot(2,1,1)
 plot (tempo,paccr(1,:),'r','LineWidth',1);
 hold on
-plot (tempo,vsx(3,:),'k','LineWidth',1);
+% plot (tempo,vsx(3,:),'k','LineWidth',1);
 hold on
 plot (tempo,paccd(1,:),'b--','LineWidth',1);
 xlabel('Tempo(s)');ylabel('Aceleração em x (m/s^2)');
@@ -417,7 +416,7 @@ grid on
 subplot(2,1,2)
 plot (tempo,paccr(2,:),'r','LineWidth',1);
 hold on
-plot (tempo,vsy(3,:),'k','LineWidth',1);
+% plot (tempo,vsy(3,:),'k','LineWidth',1);
 hold on
 plot (tempo,paccd(2,:),'b--','LineWidth',1);
 xlabel('Tempo(s)');ylabel('Aceleração em y (m/s^2)');
