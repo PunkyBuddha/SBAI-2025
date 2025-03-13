@@ -82,7 +82,7 @@ z_max = 1; % Velocidade máxima desejada em z
 %% Ganhos / Parametros
 Kd = 1/4*diag([7 7]); % Ganho diferencial (Em relação ao erro de velocidade)
 Kp = 1/5*diag([5.5 5.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
-Ku = diag([.88 .88]); % Parametro de modelagem em relação a u
+Ku = diag([.88 1.3*.88]); % Parametro de modelagem em relação a u
 Kv = diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
 Kz = 1; % Ganho em z
 K_psi = 3; % Ganho em psi
