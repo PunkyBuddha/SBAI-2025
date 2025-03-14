@@ -34,7 +34,7 @@ ButtonHandle = uicontrol('Style', 'PushButton', ...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% timers
-T_exp = 60; % Tempo de experimento
+T_exp = 30; % Tempo de experimento
 t_exp = tic;
 T_run = 1/30; % Período do experimento
 % T_run = 1/50;
@@ -70,22 +70,22 @@ vsy = [];
 %% Parametros 
 flag = 1; % Linear = 0; INDI = 1;
 alfa = .5; % Ganho do filtro de primeira ordem para derivada numerica
-alfau = .001; % Ganho do filtro de primeira ordem para derivada numerica em nuo
-lambda = .4;
+alfau = .05; % Ganho do filtro de primeira ordem para derivada numerica em nuo
+lambda = 1;
 tao = 1;
-w = (2*pi)/7; % Frequência da trajetória
+w = (2*pi)/5; % Frequência da trajetória
 theta_max = deg2rad(10); % Angulo maximo desejado em Theta
 phi_max = deg2rad(10); % Angulo maximo desejado em Phi
 psi_max = deg2rad(100); % Angulo maximo desejado em Psi
 z_max = 1; % Velocidade máxima desejada em z
 
 %% Ganhos / Parametros
-Kd = 1/4*diag([7 7]); % Ganho diferencial (Em relação ao erro de velocidade)
-Kp = 1/5*diag([5.5 5.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
-Ku = diag([.88 1.3*.88]); % Parametro de modelagem em relação a u
+Kd = diag([9 7]); % Ganho diferencial (Em relação ao erro de velocidade)
+Kp = diag([7.5 5.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
+Ku = 5*diag([.88 .88]); % Parametro de modelagem em relação a u
 Kv = diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
 Kz = 1; % Ganho em z
-K_psi = 3; % Ganho em psi
+K_psi = 5; % Ganho em psi
 
 %% Filtro de segunda ordem
 
@@ -169,7 +169,8 @@ while toc(t_exp) < T_exp
 %         Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
 
         % % Orientação
-        psid = [atan2(Xd_dot(2),Xd_dot(1)); 0]; % Orientação desejada
+%         psid = [atan2(Xd_dot(2),Xd_dot(1)); 0]; % Orientação desejada
+        psid = [0; 0];
 
         pd = [pd Xd(1:3)]; % Armazenamento da posição desejada
         pveld = [pveld Xd_dot(1:3)]; % Armazenamento da velocidade desejada
