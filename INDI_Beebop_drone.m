@@ -39,8 +39,8 @@ ButtonHandle = uicontrol('Style', 'PushButton', ...
 %% timers
 T_exp = 30; % Tempo de experimento
 t_exp = tic;
-T_run = 1/30; % Período do experimento
-% T_run = 1/50;
+% T_run = 1/30; % Período do experimento
+T_run = 1/50;
 t_run = tic;
 T_draw=0;
 tempo = [];
@@ -61,21 +61,15 @@ pu = []; % Esforço de controlador
 er = []; % Erro para plot
 ppsid = []; % Orientação desejada
 ppsir = []; % Orientação realizada
-pibks = []; % Vetor de armazenamento controle IBKS
 thetai = 0;
 phii = 0;
-Xfo = [0;0;0];
-qx = [0;0];
-qy = [0;0];
-vsx = [];
-vsy = [];
+vfreq = [];
 
 %% Parametros 
 flag = 0; % Linear = 0; INDI = 1;
 alfa = .5; % Ganho do filtro de primeira ordem para derivada numerica
-alfau = .5; % Ganho do filtro de primeira ordem para derivada numerica em nuo
+alfau = .95; % Ganho do filtro de primeira ordem para derivada numerica em nuo
 lambda = 1;
-tao = 1;
 w = (2*pi)/6; % Frequência da trajetória
 theta_max = deg2rad(10); % Angulo maximo desejado em Theta
 phi_max = deg2rad(10); % Angulo maximo desejado em Phi
@@ -111,55 +105,35 @@ pause(3);
 try
 while toc(t_exp) < T_exp
     if toc(t_run) > T_run
+        freq = tic;
         tempo = [tempo toc(t_exp)];
         dt = toc(t_run);
         t_run = tic;
         t = toc(t_exp);
         t_corpo = tic;
-        
+% for t = 0:T_run:T_exp
+%     tempo = [tempo t];
+%     t_run = tic;
+freq = tic;
+     
 %       %% Leitura da pose do robô via optitrack
-        quat = [pose.LatestMessage.Pose.Orientation.W pose.LatestMessage.Pose.Orientation.X pose.LatestMessage.Pose.Orientation.Y pose.LatestMessage.Pose.Orientation.Z]; % Recebe as informações de orientação em quaternal
+        pose1=pose.LatestMessage;
+        quat = [pose1.Pose.Orientation.W pose1.Pose.Orientation.X pose1.Pose.Orientation.Y pose1.Pose.Orientation.Z]; % Recebe as informações de orientação em quaternal
         EulZYX = quat2eul(quat); % converte quaternal para euler (em rad)
-        % position = [pose.LatestMessage.Pose.Position.X;pose.LatestMessage.Pose.Position.Y;pose.LatestMessage.Pose.Position.Z]; % Recebe informações de posição
         anglesXYZ = [EulZYX(3); EulZYX(2); EulZYX(1)]; % Reorganiza o vetor para theta, phi, psi
-
-        % X = position; % Vetor de posição  
-        % X_dot = alfa*((X - X_ant)/dt) + (1 - alfa)*X_dot_ant; % Derivação numérica da posição com filtro de primeira ordem
-        % X_2dot = alfa*((X_dot - X_dot_ant)/dt) + (1 - alfa)*X_2dot_ant; % Derivação numérica da velocidade com filtro de primeira ordem
-        % X_2dot_ant = X_2dot; % Recebe aceleração anterior
-        % X_dot_ant = X_dot; % Recebe velocidade anterior
-        % X_ant = X; % Recebe posição anterior
         psi = anglesXYZ(3); % Orientação do drone
         nuo = alfau*(anglesXYZ(1:2) - nuo_ant) + (1 - alfau)*nuo_ant; % Angulos reais do drone em theta e phi
         nuo_ant = nuo;
-        X = [posesod.LatestMessage.Pose.Position.X; posesod.LatestMessage.Pose.Position.Y; posesod.LatestMessage.Pose.Position.Z];
-        X_dot = [velsod.LatestMessage.Twist.Linear.X; velsod.LatestMessage.Twist.Linear.Y; velsod.LatestMessage.Twist.Linear.Z];
-        acc = [accsod.LatestMessage.Accel.Linear.X; accsod.LatestMessage.Accel.Linear.Y; accsod.LatestMessage.Accel.Linear.Z];
+
+        posesod1=posesod.LatestMessage;
+        velsod1=velsod.LatestMessage;
+        accsod1=accsod.LatestMessage;
+        X = [posesod1.Pose.Position.X; posesod1.Pose.Position.Y; posesod1.Pose.Position.Z];
+        X_dot = [velsod1.Twist.Linear.X; velsod1.Twist.Linear.Y; velsod1.Twist.Linear.Z];
+        acc = [accsod1.Accel.Linear.X; accsod1.Accel.Linear.Y; accsod1.Accel.Linear.Z];
         X_2dot = alfa*(acc - X_2dot_ant) + (1 - alfa)*X_2dot_ant;
         X_2dot_ant = X_2dot; % Recebe aceleração anterior
 
-%         X = inv(1 - (dt/tao))*(X_ant + (dt/tao)*position);
-%         psi = inv(1 - (dt/tao))*(psi_ant + (dt/tao)*anglesXYZ(3)); % Orientação do drone
-%         nuo = inv(1 - (dt/tao))*(nuo_ant + (dt/tao)*anglesXYZ(1:2));
-%         X_dot = (X - X_ant)/dt;
-%         X_2dot = (X_dot - X_dot_ant)/dt;
-%         X_ant = X;
-%         X_dot_ant = X_dot;
-%         X_2dot_ant = X_2dot; % Recebe aceleração anterior
-%         nuo_ant = nuo;
-%         psi_ant = psi;
-        
-%         sx = C*qx + D*position(1);
-%         sy = C*qy + D*position(2);
-%         qx = Ad*qx + Bd*position(1);
-%         qy = Ad*qy + Bd*position(2);
-% 
-%         vsx = [vsx sx];
-%         vsy = [vsy sy];
-% 
-%         X = [sx(1); sy(1); position(3)];
-%         X_dot = [sx(2); sy(2); 0];
-%         X_2dot = [sx(3); sy(3); 0];
 
         %% PLANEJADOR DE MOVIMENTO
         % % Lemniscata
@@ -167,16 +141,7 @@ while toc(t_exp) < T_exp
         Xd_dot = [.7*cos(w*t)*w; .7*cos(2*w*t)*2*w; 0]; % Velocidade desejada
         Xd_2dot = [-.7*sin(w*t)*w^2; -.7*sin(2*w*t)*4*w^2; 0]; % Aceleração desejada
 
-%         Xd = [0; 0; 1]; % Posição desejada
-%         Xd_dot = [0; 0; 0]; % Velocidade desejada
-%         Xd_2dot = [0; 0; 0]; % Aceleração desejada
-
-%         Xd = [sin(w*t); cos(w*t); 1+0.25*sin(2*w*t)]; % Posição desejada
-%         Xd_dot = [cos(w*t)*w; -sin(w*t)*w; 0.25*cos(2*w*t)*2*w]; % Velocidade desejada
-%         Xd_2dot = [-sin(w*t)*w^2; -cos(w*t)*w^2; -0.25*sin(2*w*t)*4*w^2]; % Aceleração desejada
-
         % % Orientação
-%         psid = [atan2(Xd_dot(2),Xd_dot(1)); 0]; % Orientação desejada
         psid = [0; 0];
 
         pd = [pd Xd(1:3)]; % Armazenamento da posição desejada
@@ -195,12 +160,12 @@ while toc(t_exp) < T_exp
         x_2dot_ref = Xd_2dot(1:2) + Kd*X_dot_til(1:2) + Kp*X_til(1:2); % Aceleração de referência
 
         if flag == 0
-            nu = inv(R*Ku)*(x_2dot_ref + Kv*X_dot(1:2)); % Lei de controle linear
+            nu = (R*Ku)\(x_2dot_ref + Kv*X_dot(1:2)); % Lei de controle linear
 
             theta = min(max(nu(1),-1),1); % Saturação de +-1 em theta Linear
             phi = min(max(nu(2),-1),1); % Saturação de +-1 em phi Linear
         else if flag == 1
-                nui = nuo + lambda*inv(R*Ku)*(x_2dot_ref - X_2dot_ant(1:2)); % Lei de controle IBKS
+                nui = nuo + (R*Ku)\(x_2dot_ref - X_2dot_ant(1:2)); % Lei de controle IBKS
 
                 thetai = min(max(nui(1),-1),1); % Saturação de +-1 em theta IBKS
                 phii = min(max(nui(2),-1),1); % Saturação de +-1 em phi IBKS
@@ -238,12 +203,10 @@ while toc(t_exp) < T_exp
         paccr = [paccr X_2dot]; % Armazenamento de Aceleração para calculo de erro
         ppsir = [ppsir psi]; %  Armazenamento de orientação para calculo de erro
         pu = [pu u]; % Armazenamento do sinal de controle para plot 
-        
-        %% Segurança
-%         disp(u')        
-        
-%         u = [0 0 0 0]';
-        
+ 
+
+
+        %% Segurança        
         % JOYSTICK
         Analog = axis(J); Digital = button(J);
         
@@ -301,6 +264,8 @@ while toc(t_exp) < T_exp
         
         send(pub,msg)
 %         end
+% vfreq = [vfreq toc(freq)];
+
     end
 end
 catch ME
@@ -328,123 +293,144 @@ send(pub_land,msg_land);
 pause(0.2);
 end
 
-er = pd - pr; % Calculo de erros de posicionamento
-err = ppsid - ppsir;
-% d_ec=sqrt(er(1,:).^2+er(2,:).^2); % Calculo de erro euclidiano
+% er = pd - pr; % Calculo de erros de posicionamento
+% erv = pveld - pvelr;
+% era = paccd - paccr;
+% err = ppsid - ppsir;
+% % d_ec=sqrt(er(1,:).^2+er(2,:).^2); % Calculo de erro euclidiano
+% 
+% figure('Name','Graficos de erro')
+% subplot(4,1,1)
+% plot (tempo,er(1,:),'b','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Erro em x(m)');
+% grid on
+% subplot(4,1,2)
+% plot (tempo,er(2,:),'r','LineWidth',1)
+% xlabel('Tempo(s)');ylabel('Erro em y(m)');
+% grid on
+% subplot(4,1,3)
+% plot (tempo,er(3,:),'k','LineWidth',1)
+% xlabel('Tempo(s)');ylabel('Erro em z(m)');
+% grid on
+% subplot(4,1,4)
+% plot (tempo,err,'c','LineWidth',1)
+% xlabel('Tempo(s)');ylabel('Erro em psi(rad)');
+% grid on
+% 
+% figure('Name','Gráficos de posição vs Tempo')
+% subplot(4,1,1)
+% plot (tempo,pr(1,:),'r','LineWidth',1);
+% hold on
+% % plot (tempo,vsx(1,:),'k','LineWidth',1);
+% hold on
+% plot (tempo,pd(1,:),'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Posição em x (m)');
+% legend('Posição realizada','Posição desejada');
+% grid on
+% subplot(4,1,2)
+% plot (tempo,pr(2,:),'r','LineWidth',1);
+% hold on
+% % plot (tempo,vsy(1,:),'k','LineWidth',1);
+% hold on
+% plot (tempo,pd(2,:),'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Posição em y (m)');
+% legend('Posição realizada','Posição desejada');
+% grid on
+% subplot(4,1,3)
+% plot (tempo,pr(3,:),'r','LineWidth',1);
+% hold on
+% plot (tempo,pd(3,:),'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Posição em z (m)');
+% legend('Posição realizada','Posição desejada');
+% grid on
+% subplot(4,1,4)
+% plot (tempo,ppsir,'r','LineWidth',1);
+% hold on
+% plot (tempo,ppsid,'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Posição em psi (rad)');
+% legend('Posição realizada','Posição desejada');
+% grid on
+% 
+% figure('Name','Gráficos de velocidade vs Tempo')
+% subplot(3,1,1)
+% plot (tempo,pvelr(1,:),'r','LineWidth',1);
+% hold on
+% % plot (tempo,vsx(2,:),'k','LineWidth',1);
+% hold on
+% plot (tempo,pveld(1,:),'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Velocidade em x (m/s)');
+% legend('Velocidade realizada','Velocidade desejada');
+% grid on
+% subplot(3,1,2)
+% plot (tempo,pvelr(2,:),'r','LineWidth',1);
+% hold on
+% % plot (tempo,vsy(2,:),'k','LineWidth',1);
+% hold on
+% plot (tempo,pveld(2,:),'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Velocidade em y (m/s)');
+% legend('Velocidade realizada','Velocidade desejada');
+% grid on
+% subplot(3,1,3)
+% plot (tempo,pvelr(3,:),'r','LineWidth',1);
+% hold on
+% plot (tempo,pveld(3,:),'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Velocidade em z (m/s)');
+% legend('Velocidade realizada','Velocidade desejada');
+% grid on
+% 
+% figure('Name','Gráficos de Aceleração vs Tempo')
+% subplot(2,1,1)
+% plot (tempo,paccr(1,:),'r','LineWidth',1);
+% hold on
+% % plot (tempo,vsx(3,:),'k','LineWidth',1);
+% hold on
+% plot (tempo,paccd(1,:),'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Aceleração em x (m/s^2)');
+% legend('Aceleração realizada','Aceleração desejada');
+% grid on
+% subplot(2,1,2)
+% plot (tempo,paccr(2,:),'r','LineWidth',1);
+% hold on
+% % plot (tempo,vsy(3,:),'k','LineWidth',1);
+% hold on
+% plot (tempo,paccd(2,:),'b--','LineWidth',1);
+% xlabel('Tempo(s)');ylabel('Aceleração em y (m/s^2)');
+% legend('Aceleração realizada','Aceleração desejada');
+% grid on
+% 
+% figure('Name','Esforço do controlador')
+% subplot(4,1,1)
+% plot (tempo,pu(1,:),'b');
+% xlabel('Tempo(s)');ylabel('Esforço do controlador em theta');
+% grid on
+% subplot(4,1,2)
+% plot (tempo,pu(2,:),'b');
+% xlabel('Tempo(s)');ylabel('Esforço do controlador em phi');
+% grid on
+% subplot(4,1,3)
+% plot (tempo,pu(3,:),'b');
+% xlabel('Tempo(s)');ylabel('Esforço do controlador em z');
+% grid on
+% subplot(4,1,4)
+% plot (tempo,pu(4,:),'b');
+% xlabel('Tempo(s)');ylabel('Esforço do controlador em psi');
+% grid on
+% 
+% 
+% figure
+% title('Erro de aceleração')
+% subplot(211)
+% plot(tempo,era(1,:),'Linewidth',1.5);
+% xlabel('Tempo(s)'); ylabel('Erro de aceleração em x');
+% subplot(212)
+% plot(tempo,era(1,:),'Linewidth',1.5);
+% xlabel('Tempo(s)'); ylabel('Erro de aceleração em y');
+% 
+% figure
+% subplot(211)
+% plot(tempo,erv(1,:),'Linewidth',1.5);
+% xlabel('Tempo(s)'); ylabel('Erro de velocidade em x');
+% subplot(212)
+% plot(tempo,erv(2,:),'Linewidth',1.5);
+% xlabel('Tempo(s)'); ylabel('Erro de velocidade em y');
 
-figure('Name','Graficos de erro')
-subplot(4,1,1)
-plot (tempo,er(1,:),'b','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Erro em x(m)');
-grid on
-subplot(4,1,2)
-plot (tempo,er(2,:),'r','LineWidth',1)
-xlabel('Tempo(s)');ylabel('Erro em y(m)');
-grid on
-subplot(4,1,3)
-plot (tempo,er(3,:),'k','LineWidth',1)
-xlabel('Tempo(s)');ylabel('Erro em z(m)');
-grid on
-subplot(4,1,4)
-plot (tempo,err,'c','LineWidth',1)
-xlabel('Tempo(s)');ylabel('Erro em psi(rad)');
-grid on
-
-figure('Name','Gráficos de posição vs Tempo')
-subplot(4,1,1)
-plot (tempo,pr(1,:),'r','LineWidth',1);
-hold on
-% plot (tempo,vsx(1,:),'k','LineWidth',1);
-hold on
-plot (tempo,pd(1,:),'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Posição em x (m)');
-legend('Posição realizada','Posição desejada');
-grid on
-subplot(4,1,2)
-plot (tempo,pr(2,:),'r','LineWidth',1);
-hold on
-% plot (tempo,vsy(1,:),'k','LineWidth',1);
-hold on
-plot (tempo,pd(2,:),'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Posição em y (m)');
-legend('Posição realizada','Posição desejada');
-grid on
-subplot(4,1,3)
-plot (tempo,pr(3,:),'r','LineWidth',1);
-hold on
-plot (tempo,pd(3,:),'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Posição em z (m)');
-legend('Posição realizada','Posição desejada');
-grid on
-subplot(4,1,4)
-plot (tempo,ppsir,'r','LineWidth',1);
-hold on
-plot (tempo,ppsid,'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Posição em psi (rad)');
-legend('Posição realizada','Posição desejada');
-grid on
-
-figure('Name','Gráficos de velocidade vs Tempo')
-subplot(3,1,1)
-plot (tempo,pvelr(1,:),'r','LineWidth',1);
-hold on
-% plot (tempo,vsx(2,:),'k','LineWidth',1);
-hold on
-plot (tempo,pveld(1,:),'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Velocidade em x (m/s)');
-legend('Velocidade realizada','Velocidade desejada');
-grid on
-subplot(3,1,2)
-plot (tempo,pvelr(2,:),'r','LineWidth',1);
-hold on
-% plot (tempo,vsy(2,:),'k','LineWidth',1);
-hold on
-plot (tempo,pveld(2,:),'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Velocidade em y (m/s)');
-legend('Velocidade realizada','Velocidade desejada');
-grid on
-subplot(3,1,3)
-plot (tempo,pvelr(3,:),'r','LineWidth',1);
-hold on
-plot (tempo,pveld(3,:),'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Velocidade em z (m/s)');
-legend('Velocidade realizada','Velocidade desejada');
-grid on
-
-figure('Name','Gráficos de Aceleração vs Tempo')
-subplot(2,1,1)
-plot (tempo,paccr(1,:),'r','LineWidth',1);
-hold on
-% plot (tempo,vsx(3,:),'k','LineWidth',1);
-hold on
-plot (tempo,paccd(1,:),'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Aceleração em x (m/s^2)');
-legend('Aceleração realizada','Aceleração desejada');
-grid on
-subplot(2,1,2)
-plot (tempo,paccr(2,:),'r','LineWidth',1);
-hold on
-% plot (tempo,vsy(3,:),'k','LineWidth',1);
-hold on
-plot (tempo,paccd(2,:),'b--','LineWidth',1);
-xlabel('Tempo(s)');ylabel('Aceleração em y (m/s^2)');
-legend('Aceleração realizada','Aceleração desejada');
-grid on
-
-figure('Name','Esforço do controlador')
-subplot(4,1,1)
-plot (tempo,pu(1,:),'b');
-xlabel('Tempo(s)');ylabel('Esforço do controlador em theta');
-grid on
-subplot(4,1,2)
-plot (tempo,pu(2,:),'b');
-xlabel('Tempo(s)');ylabel('Esforço do controlador em phi');
-grid on
-subplot(4,1,3)
-plot (tempo,pu(3,:),'b');
-xlabel('Tempo(s)');ylabel('Esforço do controlador em z');
-grid on
-subplot(4,1,4)
-plot (tempo,pu(4,:),'b');
-xlabel('Tempo(s)');ylabel('Esforço do controlador em psi');
-grid on
