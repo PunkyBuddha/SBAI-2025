@@ -71,21 +71,21 @@ vsx = [];
 vsy = [];
 
 %% Parametros 
-flag = 1; % Linear = 0; INDI = 1;
+flag = 0; % Linear = 0; INDI = 1;
 alfa = .5; % Ganho do filtro de primeira ordem para derivada numerica
-alfau = .05; % Ganho do filtro de primeira ordem para derivada numerica em nuo
+alfau = .5; % Ganho do filtro de primeira ordem para derivada numerica em nuo
 lambda = 1;
 tao = 1;
-w = (2*pi)/5; % Frequência da trajetória
+w = (2*pi)/6; % Frequência da trajetória
 theta_max = deg2rad(10); % Angulo maximo desejado em Theta
 phi_max = deg2rad(10); % Angulo maximo desejado em Phi
 psi_max = deg2rad(100); % Angulo maximo desejado em Psi
 z_max = 1; % Velocidade máxima desejada em z
 
 %% Ganhos / Parametros
-Kd = diag([9 7]); % Ganho diferencial (Em relação ao erro de velocidade)
-Kp = diag([7.5 5.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
-Ku = 5*diag([.88 .88]); % Parametro de modelagem em relação a u
+Kd = diag([7 7]); % Ganho diferencial (Em relação ao erro de velocidade)
+Kp = diag([5.5 5.5]); % Ganho proporcional (Em relação ao erro de posicionamento)
+Ku = 6*diag([.88 .88]); % Parametro de modelagem em relação a u
 Kv = diag([0.18227 0.17095]); % Parametro de modelagem em relação ao disturbio de flapping
 Kz = 1; % Ganho em z
 K_psi = 5; % Ganho em psi
@@ -134,8 +134,8 @@ while toc(t_exp) < T_exp
         nuo_ant = nuo;
         X = [posesod.LatestMessage.Pose.Position.X; posesod.LatestMessage.Pose.Position.Y; posesod.LatestMessage.Pose.Position.Z];
         X_dot = [velsod.LatestMessage.Twist.Linear.X; velsod.LatestMessage.Twist.Linear.Y; velsod.LatestMessage.Twist.Linear.Z];
-        acc = = [velsod.LatestMessage.Accel.Linear.X; velsod.LatestMessage.Accel.Linear.Y; velsod.LatestMessage.Accel.Linear.Z];
-        X_2dot = alfa*(acc - nuo_ant) + (1 - alfa)*nuo_ant;
+        acc = [accsod.LatestMessage.Accel.Linear.X; accsod.LatestMessage.Accel.Linear.Y; accsod.LatestMessage.Accel.Linear.Z];
+        X_2dot = alfa*(acc - X_2dot_ant) + (1 - alfa)*X_2dot_ant;
         X_2dot_ant = X_2dot; % Recebe aceleração anterior
 
 %         X = inv(1 - (dt/tao))*(X_ant + (dt/tao)*position);
