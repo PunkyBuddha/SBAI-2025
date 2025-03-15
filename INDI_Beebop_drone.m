@@ -23,6 +23,9 @@ msg_land = rosmessage(pub_land);
 
 % pose do robô via optitrack (via NATNET)
 pose = rossubscriber('/natnet_ros/B1/pose');
+posesod = rossubscriber('/natnet_ros/B1/pose_sod');
+velsod = rossubscriber('/natnet_ros/B1/pose_sod_velocity');
+accsod = rossubscriber('/natnet_ros/B1/pose_sod_acceleration');
 
 %%%%%%%%%%%%%%%%%%%%%% Botão de Emergencia %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nLandMsg = 3;
@@ -117,19 +120,23 @@ while toc(t_exp) < T_exp
 %       %% Leitura da pose do robô via optitrack
         quat = [pose.LatestMessage.Pose.Orientation.W pose.LatestMessage.Pose.Orientation.X pose.LatestMessage.Pose.Orientation.Y pose.LatestMessage.Pose.Orientation.Z]; % Recebe as informações de orientação em quaternal
         EulZYX = quat2eul(quat); % converte quaternal para euler (em rad)
-        position = [pose.LatestMessage.Pose.Position.X;pose.LatestMessage.Pose.Position.Y;pose.LatestMessage.Pose.Position.Z]; % Recebe informações de posição
+        % position = [pose.LatestMessage.Pose.Position.X;pose.LatestMessage.Pose.Position.Y;pose.LatestMessage.Pose.Position.Z]; % Recebe informações de posição
         anglesXYZ = [EulZYX(3); EulZYX(2); EulZYX(1)]; % Reorganiza o vetor para theta, phi, psi
 
-        X = position; % Vetor de posição  
-        X_dot = alfa*((X - X_ant)/dt) + (1 - alfa)*X_dot_ant; % Derivação numérica da posição com filtro de primeira ordem
-        X_2dot = alfa*((X_dot - X_dot_ant)/dt) + (1 - alfa)*X_2dot_ant; % Derivação numérica da velocidade com filtro de primeira ordem
-        X_2dot_ant = X_2dot; % Recebe aceleração anterior
-        X_dot_ant = X_dot; % Recebe velocidade anterior
-        X_ant = X; % Recebe posição anterior
+        % X = position; % Vetor de posição  
+        % X_dot = alfa*((X - X_ant)/dt) + (1 - alfa)*X_dot_ant; % Derivação numérica da posição com filtro de primeira ordem
+        % X_2dot = alfa*((X_dot - X_dot_ant)/dt) + (1 - alfa)*X_2dot_ant; % Derivação numérica da velocidade com filtro de primeira ordem
+        % X_2dot_ant = X_2dot; % Recebe aceleração anterior
+        % X_dot_ant = X_dot; % Recebe velocidade anterior
+        % X_ant = X; % Recebe posição anterior
         psi = anglesXYZ(3); % Orientação do drone
         nuo = alfau*(anglesXYZ(1:2) - nuo_ant) + (1 - alfau)*nuo_ant; % Angulos reais do drone em theta e phi
         nuo_ant = nuo;
-
+        X = [posesod.LatestMessage.Pose.Position.X; posesod.LatestMessage.Pose.Position.Y; posesod.LatestMessage.Pose.Position.Z];
+        X_dot = [velsod.LatestMessage.Twist.Linear.X; velsod.LatestMessage.Twist.Linear.Y; velsod.LatestMessage.Twist.Linear.Z];
+        acc = = [velsod.LatestMessage.Accel.Linear.X; velsod.LatestMessage.Accel.Linear.Y; velsod.LatestMessage.Accel.Linear.Z];
+        X_2dot = alfa*(acc - nuo_ant) + (1 - alfa)*nuo_ant;
+        X_2dot_ant = X_2dot; % Recebe aceleração anterior
 
 %         X = inv(1 - (dt/tao))*(X_ant + (dt/tao)*position);
 %         psi = inv(1 - (dt/tao))*(psi_ant + (dt/tao)*anglesXYZ(3)); % Orientação do drone
