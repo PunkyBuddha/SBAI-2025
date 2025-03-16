@@ -1,0 +1,18 @@
+39 - Linear .5Kv		43 - Linear .5Kvy
+40 - Linear .6Kv		44 - Linear .6Kvy
+41 - Linear 1.4Kv		45 - Linear 1.4Kvy
+42 - Linear 1.5Kv		46 - Linear 1.5Kvy
+
+47 - Linear .5Ku		51 - Linear .5Kuy
+48 - Linear .6Ku		52 - Linear .6Kuy
+49 - Linear 1.4Ku		53 - Linear 1.4Kuy
+50 - Linear 1.5Ku		54 - Linear 1.5Kuy
+
+55 - INDI .5Ku			59 - INDI .5Kuy
+56 - INDI .6Ku			60 - INDI .6Kuy
+57 - INDI 1.4Ku			61 - INDI 1.4Kuy
+58 - INDI 1.5Ku			62 - INDI 1.5Kuy
+
+63 - Resposta Degrau Linear 	64 - Resposta Degrau Linear 
+
+
